@@ -10,7 +10,6 @@ TOOL_NAME="xcclean"
 REPO_URL="https://raw.githubusercontent.com/Mohamed-Khaterr/xcclean/main/xcclean.sh"
 DEFAULT_INSTALL_DIR="/usr/local/bin"
 INSTALL_DIR="${DEFAULT_INSTALL_DIR}"
-USE_SUDO=false
 
 # ── Colors ───────────────────────────────────────────────────────────────────
 
@@ -24,19 +23,10 @@ RESET='\033[0m'
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
 info()    { printf "  ${CYAN}i${RESET}  %s\n" "$*"; }
-success() { printf "  ${GREEN}checkmark${RESET}  %s\n" "$*"; }
+success() { printf "  ${GREEN}✓${RESET}  %s\n" "$*"; }
 warn()    { printf "  ${YELLOW}!${RESET}  %s\n" "$*"; }
 error()   { printf "  ${RED}x${RESET}  %s\n" "$*" >&2; }
 die()     { error "$*"; exit 1; }
-
-# Run a command with sudo only when needed
-run() {
-  if [[ "$USE_SUDO" == true ]]; then
-    sudo "$@"
-  else
-    "$@"
-  fi
-}
 
 print_banner() {
   printf "${CYAN}"
@@ -70,17 +60,17 @@ check_install_dir() {
   if [[ ! -d "$INSTALL_DIR" ]]; then
     info "Directory $INSTALL_DIR does not exist. Creating it..."
     if ! mkdir -p "$INSTALL_DIR" 2>/dev/null; then
-      info "Needs elevated permissions — trying with sudo..."
+      info "Permission denied — retrying with sudo..."
       sudo mkdir -p "$INSTALL_DIR" || die "Failed to create $INSTALL_DIR even with sudo."
     fi
   fi
 
-  # If not writable, set flag — only file operations will use sudo, not the whole script
+  # If not writable, re-exec the whole script with sudo automatically
   if [[ ! -w "$INSTALL_DIR" ]]; then
     warn "$INSTALL_DIR requires elevated permissions."
-    info "Will use sudo only for copying the file — you may be prompted for your password."
-    printf "\n"
-    USE_SUDO=true
+    info "Re-running installer with sudo..."
+    echo ""
+    exec sudo bash "$0" "$@"
   fi
 }
 
@@ -97,10 +87,6 @@ check_already_installed() {
 
 download_or_copy() {
   local dest="${INSTALL_DIR}/${TOOL_NAME}"
-  local tmp; tmp=$(mktemp /tmp/xcclean.XXXXXX)
-
-  # Cleanup temp file on exit
-  trap 'rm -f "$tmp"' EXIT
 
   # If xcclean.sh is in the same directory as this installer, copy it directly
   local script_dir; script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -108,22 +94,20 @@ download_or_copy() {
 
   if [[ -f "$local_script" ]]; then
     info "Found local xcclean.sh — copying..."
-    cp "$local_script" "$tmp"
+    cp "$local_script" "$dest"
   elif command -v curl &>/dev/null; then
     info "Downloading xcclean from GitHub..."
-    curl -fsSL "$REPO_URL" -o "$tmp" \
+    curl -fsSL "$REPO_URL" -o "$dest" \
       || die "Download failed. Check your connection or the URL: $REPO_URL"
   elif command -v wget &>/dev/null; then
     info "Downloading xcclean via wget..."
-    wget -qO "$tmp" "$REPO_URL" \
+    wget -qO "$dest" "$REPO_URL" \
       || die "Download failed. Check your connection or the URL: $REPO_URL"
   else
     die "Neither curl nor wget found. Place xcclean.sh next to install.sh and re-run."
   fi
 
-  # Move from temp to destination — only this step needs sudo if required
-  run cp "$tmp" "$dest"
-  run chmod +x "$dest"
+  chmod +x "$dest"
 }
 
 verify_install() {
@@ -155,7 +139,7 @@ uninstall() {
   [[ "$confirm" =~ ^[Yy]$ ]] || { info "Uninstall cancelled."; exit 0; }
 
   if [[ ! -w "$(dirname "$target")" ]]; then
-    info "Needs elevated permissions — trying with sudo..."
+    info "Permission denied — retrying with sudo..."
     sudo rm -f "$target"
   else
     rm -f "$target"
@@ -203,7 +187,7 @@ if [[ "$UNINSTALL" == true ]]; then
 fi
 
 check_xcode
-check_install_dir
+check_install_dir "$@"
 check_already_installed
 download_or_copy
 verify_install

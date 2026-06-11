@@ -22,23 +22,22 @@ RESET='\033[0m'
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
-info()    { echo -e "  ${CYAN}ℹ${RESET}  $*"; }
-success() { echo -e "  ${GREEN}✓${RESET}  $*"; }
-warn()    { echo -e "  ${YELLOW}⚠${RESET}  $*"; }
-error()   { echo -e "  ${RED}✗${RESET}  $*" >&2; }
+info()    { printf "  ${CYAN}i${RESET}  %s\n" "$*"; }
+success() { printf "  ${GREEN}✓${RESET}  %s\n" "$*"; }
+warn()    { printf "  ${YELLOW}!${RESET}  %s\n" "$*"; }
+error()   { printf "  ${RED}x${RESET}  %s\n" "$*" >&2; }
 die()     { error "$*"; exit 1; }
 
 print_banner() {
-  echo -e "${CYAN}"
-  echo ' ██╗  ██╗ ██████╗ ██████╗██╗     ███████╗ █████╗ ███╗   ██╗'
-  echo ' ╚██╗██╔╝██╔════╝██╔════╝██║     ██╔════╝██╔══██╗████╗  ██║'
-  echo '  ╚███╔╝ ██║     ██║     ██║     █████╗  ███████║██╔██╗ ██║'
-  echo '  ██╔██╗ ██║     ██║     ██║     ██╔══╝  ██╔══██║██║╚██╗██║'
-  echo ' ██╔╝ ██╗╚██████╗╚██████╗███████╗███████╗██║  ██║██║ ╚████║'
-  echo ' ╚═╝  ╚═╝ ╚═════╝ ╚═════╝╚══════╝╚══════╝╚═╝  ╚═╝╚═╝  ╚═══╝'
-  echo -e "${RESET}"
-  echo -e "  ${BOLD}Xcode DerivedData Manager — Installer${RESET}"
-  echo ""
+  printf "${CYAN}"
+  printf ' ██╗  ██╗ ██████╗ ██████╗██╗     ███████╗ █████╗ ███╗   ██╗\n'
+  printf ' ╚██╗██╔╝██╔════╝██╔════╝██║     ██╔════╝██╔══██╗████╗  ██║\n'
+  printf '  ╚███╔╝ ██║     ██║     ██║     █████╗  ███████║██╔██╗ ██║\n'
+  printf '  ██╔██╗ ██║     ██║     ██║     ██╔══╝  ██╔══██║██║╚██╗██║\n'
+  printf ' ██╔╝ ██╗╚██████╗╚██████╗███████╗███████╗██║  ██║██║ ╚████║\n'
+  printf ' ╚═╝  ╚═╝ ╚═════╝ ╚═════╝╚══════╝╚══════╝╚═╝  ╚═╝╚═╝  ╚═══╝\n'
+  printf "${RESET}\n"
+  printf "  ${BOLD}Xcode DerivedData Manager — Installer${RESET}\n\n"
 }
 
 # ── Checks ───────────────────────────────────────────────────────────────────
@@ -57,15 +56,21 @@ check_xcode() {
 }
 
 check_install_dir() {
+  # Create the directory if it doesn't exist
   if [[ ! -d "$INSTALL_DIR" ]]; then
     info "Directory $INSTALL_DIR does not exist. Creating it..."
-    mkdir -p "$INSTALL_DIR" || die "Failed to create $INSTALL_DIR. Try running with sudo."
+    if ! mkdir -p "$INSTALL_DIR" 2>/dev/null; then
+      info "Permission denied — retrying with sudo..."
+      sudo mkdir -p "$INSTALL_DIR" || die "Failed to create $INSTALL_DIR even with sudo."
+    fi
   fi
 
+  # If not writable, re-exec the whole script with sudo automatically
   if [[ ! -w "$INSTALL_DIR" ]]; then
-    warn "$INSTALL_DIR is not writable by current user."
-    warn "Re-run with sudo: sudo bash install.sh"
-    exit 1
+    warn "$INSTALL_DIR requires elevated permissions."
+    info "Re-running installer with sudo..."
+    echo ""
+    exec sudo bash "$0" "$@"
   fi
 }
 
@@ -83,7 +88,7 @@ check_already_installed() {
 download_or_copy() {
   local dest="${INSTALL_DIR}/${TOOL_NAME}"
 
-  # If xcclean.sh is in the same directory as this installer, copy it directly.
+  # If xcclean.sh is in the same directory as this installer, copy it directly
   local script_dir; script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
   local local_script="${script_dir}/xcclean.sh"
 
@@ -93,13 +98,13 @@ download_or_copy() {
   elif command -v curl &>/dev/null; then
     info "Downloading xcclean from GitHub..."
     curl -fsSL "$REPO_URL" -o "$dest" \
-      || die "Download failed. Check your internet connection or the URL:\n  $REPO_URL"
+      || die "Download failed. Check your connection or the URL: $REPO_URL"
   elif command -v wget &>/dev/null; then
     info "Downloading xcclean via wget..."
     wget -qO "$dest" "$REPO_URL" \
-      || die "Download failed. Check your internet connection or the URL:\n  $REPO_URL"
+      || die "Download failed. Check your connection or the URL: $REPO_URL"
   else
-    die "Neither curl nor wget found. Cannot download xcclean.\nManually place xcclean.sh in the same folder as install.sh and re-run."
+    die "Neither curl nor wget found. Place xcclean.sh next to install.sh and re-run."
   fi
 
   chmod +x "$dest"
@@ -107,13 +112,11 @@ download_or_copy() {
 
 verify_install() {
   if command -v "$TOOL_NAME" &>/dev/null; then
-    success "$TOOL_NAME installed successfully at $(command -v "$TOOL_NAME")"
+    success "$TOOL_NAME installed at $(command -v "$TOOL_NAME")"
   else
-    warn "$TOOL_NAME was copied to $INSTALL_DIR but is not in your PATH."
+    warn "$TOOL_NAME copied to $INSTALL_DIR but is not in your PATH."
     warn "Add this to your ~/.zshrc or ~/.bashrc:"
-    echo ""
-    echo -e "    export PATH=\"${INSTALL_DIR}:\$PATH\""
-    echo ""
+    printf "\n    export PATH=\"%s:\$PATH\"\n\n" "$INSTALL_DIR"
   fi
 }
 
@@ -123,7 +126,6 @@ uninstall() {
   local target="${INSTALL_DIR}/${TOOL_NAME}"
 
   if [[ ! -f "$target" ]]; then
-    # Also check PATH
     local found; found=$(command -v "$TOOL_NAME" 2>/dev/null || true)
     if [[ -n "$found" ]]; then
       target="$found"
@@ -136,8 +138,14 @@ uninstall() {
   read -rp "  Continue? [y/N]: " confirm
   [[ "$confirm" =~ ^[Yy]$ ]] || { info "Uninstall cancelled."; exit 0; }
 
-  rm -f "$target"
-  success "$TOOL_NAME uninstalled from $target"
+  if [[ ! -w "$(dirname "$target")" ]]; then
+    info "Permission denied — retrying with sudo..."
+    sudo rm -f "$target"
+  else
+    rm -f "$target"
+  fi
+
+  success "$TOOL_NAME removed from $target"
 }
 
 # ── Argument parsing ─────────────────────────────────────────────────────────
@@ -155,12 +163,11 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
     --help|-h)
-      echo "Usage: bash install.sh [options]"
-      echo ""
-      echo "Options:"
-      echo "  --uninstall, -u        Remove xcclean"
-      echo "  --dir, -d <path>       Install to a custom directory (default: /usr/local/bin)"
-      echo "  --help, -h             Show this help"
+      printf "Usage: bash install.sh [options]\n\n"
+      printf "Options:\n"
+      printf "  --uninstall, -u        Remove xcclean\n"
+      printf "  --dir, -d <path>       Install to a custom directory (default: /usr/local/bin)\n"
+      printf "  --help, -h             Show this help\n"
       exit 0
       ;;
     *)
@@ -175,17 +182,16 @@ print_banner
 check_macos
 
 if [[ "$UNINSTALL" == true ]]; then
-  check_install_dir
   uninstall
   exit 0
 fi
 
 check_xcode
-check_install_dir
+check_install_dir "$@"
 check_already_installed
 download_or_copy
 verify_install
 
-echo ""
+printf "\n"
 info "Run 'xcclean help' to get started."
-echo ""
+printf "\n"

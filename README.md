@@ -21,44 +21,21 @@ Xcode's DerivedData folder silently accumulates build artifacts, index stores, a
 
 ## Installation
 
-### Option 1 — Global install (recommended)
+### Quick Install
 
 ```bash
-chmod +x xcclean.sh
-sudo mv xcclean.sh /usr/local/bin/xcclean
+curl -fsSL https://raw.githubusercontent.com/Mohamed-Khaterr/xcclean/main/install.sh | sh
 ```
+
+> Installs to `~/.local/bin`. Add to PATH if needed:
+> ```bash
+> echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc  # or ~/.zshrc
+> ```
 
 Verify it works:
 
 ```bash
 xcclean help
-```
-
-### Option 2 — Shell function
-
-Add to your `~/.zshrc` or `~/.bashrc`:
-
-```bash
-function xcclean() {
-  local DD
-  DD=$(defaults read com.apple.dt.Xcode IDECustomDerivedDataLocation 2>/dev/null)
-  DD="${DD:-${HOME}/Library/Developer/Xcode/DerivedData}"
-
-  if [[ -z "$1" ]]; then
-    read -rp "Clean ALL DerivedData? [y/N]: " confirm
-    [[ "$confirm" =~ ^[Yy]$ ]] && rm -rf "${DD:?}"/* && echo "✓ Cleaned."
-  else
-    local match
-    match=$(ls "$DD" | grep -i "$1" | head -1)
-    [[ -n "$match" ]] && rm -rf "$DD/$match" && echo "✓ Cleaned $match"
-  fi
-}
-```
-
-Then reload:
-
-```bash
-source ~/.zshrc
 ```
 
 ## Usage

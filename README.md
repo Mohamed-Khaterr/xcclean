@@ -24,13 +24,8 @@ Xcode's DerivedData folder silently accumulates build artifacts, index stores, a
 ### Quick Install
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Mohamed-Khaterr/xcclean/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/Mohamed-Khaterr/xcclean/main/install.sh | bash
 ```
-
-> Installs to `~/.local/bin`. Add to PATH if needed:
-> ```bash
-> echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc  # or ~/.zshrc
-> ```
 
 Verify it works:
 

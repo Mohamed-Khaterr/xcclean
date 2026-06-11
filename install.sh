@@ -2,6 +2,13 @@
 # install.sh — Installer for xcclean
 # Usage: bash install.sh [--uninstall] [--dir /custom/path]
 
+# Guard: must run under bash, not sh
+if [ -z "${BASH_VERSION:-}" ]; then
+  echo "Error: run this script with bash, not sh." >&2
+  echo "Usage: bash install.sh" >&2
+  exit 1
+fi
+
 set -euo pipefail
 
 # ── Config ───────────────────────────────────────────────────────────────────
@@ -97,13 +104,14 @@ check_already_installed() {
 
 download_or_copy() {
   local dest="${INSTALL_DIR}/${TOOL_NAME}"
-  local tmp; tmp=$(mktemp /tmp/xcclean.XXXXXX)
+  local tmp=""
+  tmp=$(mktemp /tmp/xcclean.XXXXXX)
 
-  # Cleanup temp file on exit
-  trap 'rm -f "$tmp"' EXIT
+  # Cleanup temp file on exit — guard against tmp being empty
+  trap '[[ -n "$tmp" ]] && rm -f "$tmp"' EXIT
 
-  # If xcclean.sh is in the same directory as this installer, copy it directly
-  local script_dir; script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  # Use $0 instead of BASH_SOURCE for sh compatibility
+  local script_dir; script_dir="$(cd "$(dirname "$0")" && pwd)"
   local local_script="${script_dir}/xcclean.sh"
 
   if [[ -f "$local_script" ]]; then
@@ -155,7 +163,7 @@ uninstall() {
   [[ "$confirm" =~ ^[Yy]$ ]] || { info "Uninstall cancelled."; exit 0; }
 
   if [[ ! -w "$(dirname "$target")" ]]; then
-    info "Permission denied — retrying with sudo..."
+    info "Needs elevated permissions — trying with sudo..."
     sudo rm -f "$target"
   else
     rm -f "$target"
